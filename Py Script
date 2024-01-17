@@ -1,0 +1,81 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.feature_selection import mutual_info_regression
+
+# Styling adjustments for figures
+plt.style.use("seaborn-whitegrid")
+plt.rc("figure", autolayout=True)
+plt.rc("axes", labelweight="bold", labelsize="large", titleweight="bold", titlesize=14, titlepad=10)
+
+# Create the dataframe df
+df = pd.read_csv("ames.csv")
+
+# Display the initial dataframe data
+df.head()
+# Separate features (X) and target (y)
+X = df.drop('SalePrice', axis=1)
+y = df['SalePrice']
+
+# Separate features (X) and target (y)
+X = df.drop('SalePrice', axis=1)
+y = df['SalePrice']
+
+# Encode text columns
+categorical_cols = X.select_dtypes(include=['object']).columns.tolist()
+for col in categorical_cols:
+    X[col] = X[col].astype('category').cat.codes
+
+# Calculate Mutual Information and select the top 5 influential features
+mi_scores = mutual_info_regression(X, y)
+mi_scores = pd.Series(mi_scores, name="MI Scores", index=X.columns)
+mi_scores = mi_scores.sort_values(ascending=False)
+
+# Get the top 5 influential features
+top_features = mi_scores.head(5).index.tolist()
+
+# Filter the X dataframe to contain only the top 5 influential features
+X = X[top_features]
+
+# Apply scaling
+scaler = MinMaxScaler()
+X = scaler.fit_transform(X)
+X = pd.DataFrame(X, columns=top_features)
+
+# Create k-means model with 6 clusters
+modelo = KMeans(n_clusters=6, n_init='auto')
+
+# Get cluster labels through prediction
+X["Cluster"] = modelo.fit_predict(X)
+
+# Revert to the original scale for visualization
+X[top_features] = scaler.inverse_transform(X[top_features])
+
+# Visualize clustering results
+X_copied = X.copy()
+X_copied['Cluster'] = X_copied['Cluster'].astype("category")
+X_copied["SalePrice"] = y
+
+sns.relplot(
+    x="value", y="SalePrice", hue="Cluster", col="variable",
+    height=4, aspect=1, facet_kws={'sharex': False}, col_wrap=3,
+    data=X_copied.melt(
+        value_vars=top_features, id_vars=["SalePrice", "Cluster"],
+    ),
+);
+# Count the number of observations in each cluster
+cluster_counts = X_copied['Cluster'].value_counts()
+
+# Find the cluster with the highest average price
+cluster_with_highest_price = cluster_counts.idxmax()
+
+# Get the number of houses in the cluster with the highest price
+number_of_houses_in_highest_price_cluster = cluster_counts.max()
+
+print("Cluster number defining as houses with higher prices:", cluster_with_highest_price)
+print("Number of houses in the mentioned cluster:", number_of_houses_in_highest_price_cluster)
+
+
